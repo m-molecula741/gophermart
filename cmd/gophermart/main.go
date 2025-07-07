@@ -12,6 +12,8 @@ import (
 	"gophermart/internal/config"
 	"gophermart/internal/handler"
 	"gophermart/internal/storage"
+	"gophermart/internal/usecase"
+	"gophermart/pkg/jwt"
 )
 
 func main() {
@@ -28,8 +30,13 @@ func main() {
 	}
 	defer store.Close()
 
-	// Инициализируем обработчики
-	h := handler.NewHandler(store)
+	// Инициализируем JWT manager
+	jwtManager := jwt.NewManager(cfg.JWT.SigningKey, cfg.JWT.TokenTTL)
+
+	// Инициализируем usecase и обработчики
+	userUseCase := usecase.NewUserUseCase(store, jwtManager)
+	authHandler := handler.NewAuthHandler(userUseCase)
+	h := handler.NewHandler(authHandler)
 	router := handler.NewRouter(h)
 
 	// Создаем сервер

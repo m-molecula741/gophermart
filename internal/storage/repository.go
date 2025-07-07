@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"gophermart/internal/domain"
-	"gophermart/internal/usecase"
 
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -16,7 +16,7 @@ type PostgresRepository struct {
 }
 
 // NewPostgresRepository создает новый экземпляр PostgresRepository
-func NewPostgresRepository(ctx context.Context, dsn string) (usecase.Storage, error) {
+func NewPostgresRepository(ctx context.Context, dsn string) (*PostgresRepository, error) {
 	pool, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
@@ -48,6 +48,12 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, login, passwordHash
 		login, passwordHash,
 	)
 	if err != nil {
+		// Проверяем, является ли ошибка нарушением уникального ограничения
+		if pqErr, ok := err.(*pgconn.PgError); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				return domain.ErrUserExists
+			}
+		}
 		return fmt.Errorf("error creating user: %w", err)
 	}
 	return nil

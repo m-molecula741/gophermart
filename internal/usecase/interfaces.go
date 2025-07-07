@@ -49,3 +49,9 @@ type PasswordManager interface {
 type OrderValidator interface {
 	ValidateOrderNumber(number string) error
 }
+
+// UserUseCase определяет методы для работы с пользователями
+type UserUseCase interface {
+	Register(ctx context.Context, creds *domain.Credentials) (string, error)
+	Login(ctx context.Context, creds *domain.Credentials) (string, error)
+}

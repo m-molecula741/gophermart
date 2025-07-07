@@ -6,10 +6,10 @@ import (
 	"gophermart/internal/domain"
 )
 
-// UserUseCase определяет интерфейс для бизнес-логики работы с пользователями
+// UserUseCase определяет методы для работы с пользователями
 type UserUseCase interface {
-	Register(ctx context.Context, credentials domain.Credentials) (string, error)
-	Login(ctx context.Context, credentials domain.Credentials) (string, error)
+	Register(ctx context.Context, creds *domain.Credentials) (string, error)
+	Login(ctx context.Context, creds *domain.Credentials) (string, error)
 }
 
 // OrderUseCase определяет интерфейс для бизнес-логики работы с заказами
@@ -30,3 +30,4 @@ type BalanceUseCase interface {
 type AuthMiddleware interface {
 	GetUserID(token string) (int64, error)
 }
+ 

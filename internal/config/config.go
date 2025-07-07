@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 // Config содержит все настройки приложения
@@ -11,6 +12,13 @@ type Config struct {
 	RunAddress           string
 	DatabaseURI          string
 	AccrualSystemAddress string
+	JWT                  JWTConfig
+}
+
+// JWTConfig содержит настройки JWT
+type JWTConfig struct {
+	SigningKey []byte
+	TokenTTL   time.Duration
 }
 
 // NewConfig создает новый экземпляр конфигурации
@@ -40,6 +48,12 @@ func NewConfig() (*Config, error) {
 	}
 	if cfg.DatabaseURI == "" {
 		cfg.DatabaseURI = "postgres://postgres:postgres@localhost:5432/gophermart?sslmode=disable"
+	}
+
+	// Настройки JWT по умолчанию
+	cfg.JWT = JWTConfig{
+		SigningKey: []byte("your-secret-key"),
+		TokenTTL:   24 * time.Hour,
 	}
 
 	// Валидация конфигурации
