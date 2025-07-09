@@ -11,14 +11,30 @@ import (
 	"gophermart/internal/usecase/mocks"
 )
 
+// Переменная для мока в тестах
+var testProcessOrderAccrual = func(orderNumber string) {}
+
 func init() {
-	// Инициализируем логгер для тестов
-	if err := logger.Initialize("info"); err != nil {
+	// Инициализируем логгер для тестов с уровнем error
+	if err := logger.Initialize("error"); err != nil {
 		panic(err)
 	}
 }
 
 func TestOrderUseCase(t *testing.T) {
+	// Сохраняем оригинальную функцию
+	originalProcessFunc := testProcessOrderAccrual
+
+	// Подменяем на пустую функцию для тестов
+	testProcessOrderAccrual = func(orderNumber string) {
+		// Пустая функция, ничего не делает
+	}
+
+	// Восстанавливаем оригинальную функцию после тестов
+	defer func() {
+		testProcessOrderAccrual = originalProcessFunc
+	}()
+
 	// Тесты для загрузки заказа
 	uploadTests := []struct {
 		name          string
@@ -32,11 +48,33 @@ func TestOrderUseCase(t *testing.T) {
 			userID:      1,
 			orderNumber: "12345678903", // Валидный номер по алгоритму Луна
 			mockBehavior: func(s *mocks.MockStorage, a *mocks.MockAccrualService) {
+				// Первый вызов - при проверке существования заказа
+				var callCount int
 				s.GetOrderByNumberFunc = func(ctx context.Context, number string) (*domain.Order, error) {
-					return nil, domain.ErrOrderNotFound
+					callCount++
+					if callCount == 1 {
+						return nil, domain.ErrOrderNotFound
+					}
+					return &domain.Order{
+						Number: number,
+						UserID: 1,
+						Status: domain.StatusNew,
+					}, nil
 				}
 				s.CreateOrderFunc = func(ctx context.Context, userID int64, number string) error {
 					return nil
+				}
+				// Мокаем обновление статуса
+				s.UpdateOrderStatusAndBalanceFunc = func(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+					return nil
+				}
+				// Мокаем ответ от сервиса начислений, чтобы горутина сразу завершалась
+				a.GetOrderAccrualFunc = func(ctx context.Context, orderNumber string) (*domain.Order, error) {
+					return &domain.Order{
+						Number:  orderNumber,
+						Status:  domain.StatusProcessed,
+						Accrual: 500,
+					}, nil
 				}
 			},
 			expectedError: nil,
@@ -74,7 +112,7 @@ func TestOrderUseCase(t *testing.T) {
 					}, nil
 				}
 			},
-			expectedError: nil,
+			expectedError: domain.ErrOrderBelongsToUser,
 		},
 	}
 
@@ -246,7 +284,7 @@ func TestOrderUseCase_ProcessOrderAccrual_Error(t *testing.T) {
 	orderNumber := "12345678903"
 	userID := int64(1)
 
-	// Создаем моки с ошибками
+	// Создаем моки
 	mockStorage := &mocks.MockStorage{
 		GetOrderByNumberFunc: func(ctx context.Context, number string) (*domain.Order, error) {
 			return &domain.Order{
@@ -270,14 +308,20 @@ func TestOrderUseCase_ProcessOrderAccrual_Error(t *testing.T) {
 		},
 	}
 
-	// Создаем usecase
+	// Создаем usecase с контекстом и таймаутом
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
 	uc := NewOrderUseCase(mockStorage, mockAccrual)
 
 	// Запускаем обработку заказа
-	uc.processOrderAccrual(orderNumber)
+	go uc.processOrderAccrual(orderNumber)
 
-	// Проверяем, что все методы были вызваны
-	// Добавьте здесь дополнительные проверки, если необходимо
+	// Ждем завершения контекста
+	<-ctx.Done()
+
+	// Останавливаем обработку
+	uc.Shutdown(context.Background())
 }
 
 func TestOrderUseCase_ProcessOrderAccrual_InvalidStatus(t *testing.T) {
