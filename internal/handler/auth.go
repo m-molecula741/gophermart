@@ -70,6 +70,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем пустые учетные данные
+	if creds.Login == "" || creds.Password == "" {
+		logger.Error("Empty credentials provided")
+		http.Error(w, "login and password cannot be empty", http.StatusBadRequest)
+		return
+	}
+
 	logger.Info("Processing registration request", zap.String("login", creds.Login))
 
 	if err := h.userUseCase.Register(r.Context(), &creds); err != nil {
@@ -77,6 +84,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		case domain.ErrUserExists:
 			logger.Warn("Registration failed: user already exists", zap.String("login", creds.Login))
 			http.Error(w, "user already exists", http.StatusConflict)
+		case domain.ErrInvalidCredentials:
+			logger.Error("Registration failed", zap.Error(err), zap.String("login", creds.Login))
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		default:
 			logger.Error("Registration failed", zap.Error(err), zap.String("login", creds.Login))
 			http.Error(w, err.Error(), http.StatusInternalServerError)

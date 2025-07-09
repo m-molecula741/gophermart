@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,7 +16,6 @@ import (
 )
 
 func init() {
-	// Инициализируем логгер для тестов с уровнем error
 	if err := logger.Initialize("error"); err != nil {
 		panic(err)
 	}
@@ -29,6 +29,7 @@ func TestOrderHandler(t *testing.T) {
 		mockBehavior func(*mocks.MockOrderUseCase)
 		expectedCode int
 		withAuth     bool
+		userID       int64
 	}{
 		{
 			name:        "Успешная загрузка заказа",
@@ -41,6 +42,7 @@ func TestOrderHandler(t *testing.T) {
 			},
 			expectedCode: http.StatusAccepted,
 			withAuth:     true,
+			userID:       1,
 		},
 		{
 			name:        "Неверный формат номера заказа",
@@ -53,18 +55,56 @@ func TestOrderHandler(t *testing.T) {
 			},
 			expectedCode: http.StatusUnprocessableEntity,
 			withAuth:     true,
+			userID:       1,
 		},
 		{
-			name:        "Заказ уже существует",
+			name:        "Заказ уже существует у текущего пользователя",
 			orderNumber: "12345678903",
 			mockBehavior: func(m *mocks.MockOrderUseCase) {
 				m.UploadOrderFunc = func(ctx context.Context, userID int64, orderNumber string) error {
-					return domain.ErrOrderExists
+					return domain.ErrOrderBelongsToUser
+				}
+				m.ShutdownFunc = func(ctx context.Context) {}
+			},
+			expectedCode: http.StatusOK,
+			withAuth:     true,
+			userID:       1,
+		},
+		{
+			name:        "Заказ принадлежит другому пользователю",
+			orderNumber: "12345678903",
+			mockBehavior: func(m *mocks.MockOrderUseCase) {
+				m.UploadOrderFunc = func(ctx context.Context, userID int64, orderNumber string) error {
+					return domain.ErrOrderBelongsToAnotherUser
 				}
 				m.ShutdownFunc = func(ctx context.Context) {}
 			},
 			expectedCode: http.StatusConflict,
 			withAuth:     true,
+			userID:       1,
+		},
+		{
+			name:        "Внутренняя ошибка сервера при загрузке заказа",
+			orderNumber: "12345678903",
+			mockBehavior: func(m *mocks.MockOrderUseCase) {
+				m.UploadOrderFunc = func(ctx context.Context, userID int64, orderNumber string) error {
+					return errors.New("internal error")
+				}
+				m.ShutdownFunc = func(ctx context.Context) {}
+			},
+			expectedCode: http.StatusInternalServerError,
+			withAuth:     true,
+			userID:       1,
+		},
+		{
+			name:        "Пустой номер заказа",
+			orderNumber: "",
+			mockBehavior: func(m *mocks.MockOrderUseCase) {
+				m.ShutdownFunc = func(ctx context.Context) {}
+			},
+			expectedCode: http.StatusBadRequest,
+			withAuth:     true,
+			userID:       1,
 		},
 		{
 			name:        "Без авторизации",
@@ -79,29 +119,23 @@ func TestOrderHandler(t *testing.T) {
 
 	for _, tt := range uploadTests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Подготовка мока
 			mockUseCase := &mocks.MockOrderUseCase{}
 			tt.mockBehavior(mockUseCase)
 
-			// Создание хендлера
 			handler := NewOrderHandler(mockUseCase)
 
-			// Создание запроса
 			req := httptest.NewRequest(http.MethodPost, "/api/user/orders",
 				bytes.NewBufferString(tt.orderNumber))
 			req.Header.Set("Content-Type", "text/plain")
 			w := httptest.NewRecorder()
 
-			// Добавляем ID пользователя в контекст, если нужна авторизация
 			if tt.withAuth {
-				ctx := context.WithValue(req.Context(), userIDKey, int64(1))
+				ctx := context.WithValue(req.Context(), userIDKey, tt.userID)
 				req = req.WithContext(ctx)
 			}
 
-			// Выполнение запроса
 			handler.UploadOrder(w, req)
 
-			// Проверка результатов
 			if w.Code != tt.expectedCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
 			}
@@ -115,6 +149,7 @@ func TestOrderHandler(t *testing.T) {
 		expectedCode int
 		expectedBody []domain.Order
 		withAuth     bool
+		userID       int64
 	}{
 		{
 			name: "Успешное получение заказов",
@@ -141,6 +176,7 @@ func TestOrderHandler(t *testing.T) {
 				},
 			},
 			withAuth: true,
+			userID:   1,
 		},
 		{
 			name: "Нет заказов",
@@ -153,6 +189,20 @@ func TestOrderHandler(t *testing.T) {
 			expectedCode: http.StatusNoContent,
 			expectedBody: nil,
 			withAuth:     true,
+			userID:       1,
+		},
+		{
+			name: "Внутренняя ошибка при получении заказов",
+			mockBehavior: func(m *mocks.MockOrderUseCase) {
+				m.GetUserOrdersFunc = func(ctx context.Context, userID int64) ([]domain.Order, error) {
+					return nil, errors.New("internal error")
+				}
+				m.ShutdownFunc = func(ctx context.Context) {}
+			},
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: nil,
+			withAuth:     true,
+			userID:       1,
 		},
 		{
 			name: "Без авторизации",
@@ -167,27 +217,21 @@ func TestOrderHandler(t *testing.T) {
 
 	for _, tt := range getTests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Подготовка мока
 			mockUseCase := &mocks.MockOrderUseCase{}
 			tt.mockBehavior(mockUseCase)
 
-			// Создание хендлера
 			handler := NewOrderHandler(mockUseCase)
 
-			// Создание запроса
 			req := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
 			w := httptest.NewRecorder()
 
-			// Добавляем ID пользователя в контекст, если нужна авторизация
 			if tt.withAuth {
-				ctx := context.WithValue(req.Context(), userIDKey, int64(1))
+				ctx := context.WithValue(req.Context(), userIDKey, tt.userID)
 				req = req.WithContext(ctx)
 			}
 
-			// Выполнение запроса
 			handler.GetOrders(w, req)
 
-			// Проверка результатов
 			if w.Code != tt.expectedCode {
 				t.Errorf("Expected status code %d, got %d", tt.expectedCode, w.Code)
 			}
@@ -202,7 +246,6 @@ func TestOrderHandler(t *testing.T) {
 					t.Errorf("Expected %d orders, got %d", len(tt.expectedBody), len(response))
 				}
 
-				// Проверяем только основные поля, так как время может отличаться
 				if len(response) > 0 {
 					if response[0].Number != tt.expectedBody[0].Number {
 						t.Errorf("Expected order number %s, got %s",

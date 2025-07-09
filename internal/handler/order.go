@@ -23,7 +23,7 @@ func NewOrderHandler(orderUseCase OrderUseCase) *OrderHandler {
 	}
 }
 
-// UploadOrder обрабатывает загрузку номера заказа
+// UploadOrder обрабатывает загрузку нового заказа
 func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	// Получаем ID пользователя из контекста
 	userID, ok := r.Context().Value(userIDKey).(int64)
@@ -37,34 +37,35 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Error("Failed to read request body", zap.Error(err))
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	logger.Info("Received order number", zap.String("body", string(body)))
 	orderNumber := string(body)
+
+	// Проверяем, что номер заказа не пустой
+	if orderNumber == "" {
+		logger.Error("Empty order number")
+		http.Error(w, "order number cannot be empty", http.StatusBadRequest)
+		return
+	}
 
 	// Загружаем заказ
 	err = h.orderUseCase.UploadOrder(r.Context(), userID, orderNumber)
 	if err != nil {
+		logger.Error("Failed to upload order", zap.Error(err))
 		switch err {
 		case domain.ErrInvalidOrderNumber:
-			logger.Warn("Invalid order number", zap.String("number", orderNumber))
-			http.Error(w, "invalid order number", http.StatusUnprocessableEntity)
-		case domain.ErrOrderExists:
-			logger.Warn("Order already exists", zap.String("number", orderNumber))
-			http.Error(w, "order already exists", http.StatusConflict)
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		case domain.ErrOrderBelongsToUser:
-			logger.Info("Order already uploaded by current user", zap.String("number", orderNumber))
 			w.WriteHeader(http.StatusOK)
-			return
+		case domain.ErrOrderBelongsToAnotherUser:
+			http.Error(w, err.Error(), http.StatusConflict)
 		default:
-			logger.Error("Failed to upload order", zap.Error(err))
-			http.Error(w, "internal error", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	// Возвращаем статус 202 Accepted
 	w.WriteHeader(http.StatusAccepted)
 }
 

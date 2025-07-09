@@ -29,6 +29,15 @@ var (
 
 	// ErrOrderBelongsToUser возвращается, когда заказ уже был загружен текущим пользователем
 	ErrOrderBelongsToUser = errors.New("order already belongs to user")
+
+	// ErrOrderBelongsToAnotherUser возвращается, когда заказ принадлежит другому пользователю
+	ErrOrderBelongsToAnotherUser = errors.New("order belongs to another user")
+
+	// ErrInvalidToken возвращается при неверном или истекшем токене
+	ErrInvalidToken = errors.New("invalid token")
+
+	// ErrInvalidAmount возвращается при неверной сумме операции
+	ErrInvalidAmount = errors.New("invalid amount")
 )
 
 // TooManyRequestsError ошибка превышения лимита запросов
