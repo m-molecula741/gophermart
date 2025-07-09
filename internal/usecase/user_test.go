@@ -136,3 +136,66 @@ func TestUserUseCase(t *testing.T) {
 		})
 	}
 }
+
+func TestUserUseCase_ValidateToken(t *testing.T) {
+	tests := []struct {
+		name         string
+		token        string
+		mockBehavior func(*mocks.MockStorage, *mocks.MockJWTManager)
+		wantUserID   int64
+		wantErr      bool
+	}{
+		{
+			name:  "Успешная валидация токена",
+			token: "valid_token",
+			mockBehavior: func(s *mocks.MockStorage, j *mocks.MockJWTManager) {
+				j.ValidateTokenFunc = func(token string) (int64, error) {
+					return 1, nil
+				}
+			},
+			wantUserID: 1,
+			wantErr:    false,
+		},
+		{
+			name:  "Недействительный токен",
+			token: "invalid_token",
+			mockBehavior: func(s *mocks.MockStorage, j *mocks.MockJWTManager) {
+				j.ValidateTokenFunc = func(token string) (int64, error) {
+					return 0, domain.ErrInvalidToken
+				}
+			},
+			wantUserID: 0,
+			wantErr:    true,
+		},
+		{
+			name:  "Пустой токен",
+			token: "",
+			mockBehavior: func(s *mocks.MockStorage, j *mocks.MockJWTManager) {
+				j.ValidateTokenFunc = func(token string) (int64, error) {
+					return 0, domain.ErrInvalidToken
+				}
+			},
+			wantUserID: 0,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStorage := &mocks.MockStorage{}
+			mockJWT := &mocks.MockJWTManager{}
+			tt.mockBehavior(mockStorage, mockJWT)
+
+			uc := NewUserUseCase(mockStorage, mockJWT)
+
+			userID, err := uc.ValidateToken(context.Background(), tt.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateToken() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if userID != tt.wantUserID {
+				t.Errorf("ValidateToken() userID = %v, want %v", userID, tt.wantUserID)
+			}
+		})
+	}
+}

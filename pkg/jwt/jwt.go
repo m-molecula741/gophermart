@@ -11,6 +11,12 @@ var (
 	ErrInvalidToken = errors.New("invalid token")
 )
 
+// TokenManager интерфейс для работы с JWT токенами
+type TokenManager interface {
+	GenerateToken(userID int64) (string, error)
+	ValidateToken(token string) (int64, error)
+}
+
 // Manager управляет JWT токенами
 type Manager struct {
 	signingKey []byte

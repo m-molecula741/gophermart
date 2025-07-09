@@ -14,11 +14,11 @@ import (
 // userUseCase реализует бизнес-логику для работы с пользователями
 type userUseCase struct {
 	storage Storage
-	jwt     *jwt.Manager
+	jwt     jwt.TokenManager
 }
 
 // NewUserUseCase создает новый экземпляр userUseCase
-func NewUserUseCase(storage Storage, jwt *jwt.Manager) *userUseCase {
+func NewUserUseCase(storage Storage, jwt jwt.TokenManager) *userUseCase {
 	return &userUseCase{
 		storage: storage,
 		jwt:     jwt,

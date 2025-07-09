@@ -40,6 +40,13 @@ func (uc *balanceUseCase) GetBalance(ctx context.Context, userID int64) (*domain
 
 // Withdraw списывает баллы с баланса пользователя
 func (uc *balanceUseCase) Withdraw(ctx context.Context, userID int64, withdrawal domain.WithdrawalRequest) error {
+	// Проверяем, что сумма положительная
+	if withdrawal.Sum <= 0 {
+		logger.Error("Invalid withdrawal amount",
+			zap.Float64("sum", withdrawal.Sum))
+		return domain.ErrInvalidAmount
+	}
+
 	// Проверяем, что номер заказа состоит только из цифр
 	if _, err := strconv.ParseInt(withdrawal.Order, 10, 64); err != nil {
 		logger.Error("Invalid order number format",
