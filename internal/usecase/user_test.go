@@ -6,11 +6,19 @@ import (
 	"time"
 
 	"gophermart/internal/domain"
+	"gophermart/internal/logger"
 	"gophermart/internal/usecase/mocks"
 	"gophermart/pkg/jwt"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+func init() {
+	// Инициализируем логгер для тестов
+	if err := logger.Initialize("info"); err != nil {
+		panic(err)
+	}
+}
 
 func TestUserUseCase(t *testing.T) {
 	// Создаем JWT менеджер для тестов
@@ -137,7 +145,7 @@ func TestUserUseCase(t *testing.T) {
 					t.Error("Expected token, got empty string")
 				}
 				// Проверяем, что токен валидный
-				userID, err := jwtManager.ParseToken(token)
+				userID, err := jwtManager.ValidateToken(token)
 				if err != nil {
 					t.Errorf("Invalid token: %v", err)
 				}

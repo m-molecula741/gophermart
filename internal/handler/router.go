@@ -17,12 +17,12 @@ func NewRouter(h *Handler) chi.Router {
 	r.Post("/api/user/register", h.auth.Register)
 	r.Post("/api/user/login", h.auth.Login)
 
-	// Protected routes будут добавлены позже
-	// r.Group(func(r chi.Router) {
-	//     r.Use(h.auth.AuthMiddleware)
-	//     // Protected endpoints
-	// })
+	// Protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(h.auth.AuthMiddleware)
+		r.Post("/api/user/orders", h.order.UploadOrder)
+		r.Get("/api/user/orders", h.order.GetOrders)
+	})
 
 	return r
 }
- 

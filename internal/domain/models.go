@@ -2,25 +2,6 @@ package domain
 
 import "time"
 
-// OrderStatus представляет статус заказа
-type OrderStatus string
-
-const (
-	OrderStatusNew       OrderStatus = "NEW"
-	OrderStatusInvalid   OrderStatus = "INVALID"
-	OrderStatusAccepted  OrderStatus = "ACCEPTED"
-	OrderStatusProcessed OrderStatus = "PROCESSED"
-)
-
-// Order представляет заказ в системе
-type Order struct {
-	Number     string      `json:"number"`
-	UserID     int64       `json:"-"`
-	Status     OrderStatus `json:"status"`
-	Accrual    float64     `json:"accrual,omitempty"`
-	UploadedAt time.Time   `json:"uploaded_at"`
-}
-
 // Balance представляет баланс пользователя
 type Balance struct {
 	Current   float64 `json:"current"`

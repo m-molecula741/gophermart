@@ -25,11 +25,18 @@ type JWTConfig struct {
 func NewConfig() (*Config, error) {
 	var cfg Config
 
+	// Создаем новый FlagSet
+	flags := flag.NewFlagSet("config", flag.ContinueOnError)
+
 	// Чтение флагов командной строки
-	flag.StringVar(&cfg.RunAddress, "a", "", "address and port to run server")
-	flag.StringVar(&cfg.DatabaseURI, "d", "", "database connection string")
-	flag.StringVar(&cfg.AccrualSystemAddress, "r", "", "Accrual system address")
-	flag.Parse()
+	flags.StringVar(&cfg.RunAddress, "a", "", "address and port to run server")
+	flags.StringVar(&cfg.DatabaseURI, "d", "", "database connection string")
+	flags.StringVar(&cfg.AccrualSystemAddress, "r", "", "Accrual system address")
+
+	// Парсим флаги только если не в тестовом режиме
+	if len(os.Args) > 0 {
+		flags.Parse(os.Args[1:])
+	}
 
 	// Чтение переменных окружения, если флаги не установлены
 	if cfg.RunAddress == "" {
@@ -40,14 +47,6 @@ func NewConfig() (*Config, error) {
 	}
 	if cfg.AccrualSystemAddress == "" {
 		cfg.AccrualSystemAddress = os.Getenv("ACCRUAL_SYSTEM_ADDRESS")
-	}
-
-	// Значения по умолчанию
-	if cfg.RunAddress == "" {
-		cfg.RunAddress = "localhost:8080"
-	}
-	if cfg.DatabaseURI == "" {
-		cfg.DatabaseURI = "postgres://postgres:postgres@localhost:5432/gophermart?sslmode=disable"
 	}
 
 	// Настройки JWT по умолчанию

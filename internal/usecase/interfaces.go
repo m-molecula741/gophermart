@@ -52,6 +52,10 @@ type OrderValidator interface {
 
 // UserUseCase определяет методы для работы с пользователями
 type UserUseCase interface {
+	// Register регистрирует нового пользователя
 	Register(ctx context.Context, creds *domain.Credentials) (string, error)
+	// Login аутентифицирует пользователя
 	Login(ctx context.Context, creds *domain.Credentials) (string, error)
+	// ValidateToken проверяет токен и возвращает ID пользователя
+	ValidateToken(ctx context.Context, token string) (int64, error)
 }

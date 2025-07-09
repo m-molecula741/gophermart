@@ -45,8 +45,8 @@ func (m *Manager) GenerateToken(userID int64) (string, error) {
 	return token.SignedString(m.signingKey)
 }
 
-// ParseToken проверяет и парсит JWT токен
-func (m *Manager) ParseToken(tokenString string) (int64, error) {
+// ValidateToken проверяет JWT токен и возвращает ID пользователя
+func (m *Manager) ValidateToken(tokenString string) (int64, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken

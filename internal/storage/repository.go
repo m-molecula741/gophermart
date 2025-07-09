@@ -2,7 +2,10 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	"gophermart/internal/domain"
 
@@ -78,9 +81,9 @@ func (r *PostgresRepository) GetUserByLogin(ctx context.Context, login string) (
 // CreateOrder создает новый заказ
 func (r *PostgresRepository) CreateOrder(ctx context.Context, userID int64, number string) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO orders (number, user_id, status) 
-		 VALUES ($1, $2, $3)`,
-		number, userID, domain.OrderStatusNew,
+		`INSERT INTO orders (number, user_id, status, uploaded_at) 
+		 VALUES ($1, $2, $3, $4)`,
+		number, userID, domain.StatusNew, time.Now(),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating order: %w", err)
@@ -91,23 +94,40 @@ func (r *PostgresRepository) CreateOrder(ctx context.Context, userID int64, numb
 // GetOrderByNumber находит заказ по номеру
 func (r *PostgresRepository) GetOrderByNumber(ctx context.Context, number string) (*domain.Order, error) {
 	var order domain.Order
+	var processedAt sql.NullTime
+
 	err := r.pool.QueryRow(ctx,
-		`SELECT number, user_id, status, accrual, uploaded_at 
+		`SELECT number, user_id, status, accrual, uploaded_at, processed_at 
 		 FROM orders 
 		 WHERE number = $1`,
 		number,
-	).Scan(&order.Number, &order.UserID, &order.Status, &order.Accrual, &order.UploadedAt)
+	).Scan(
+		&order.Number,
+		&order.UserID,
+		&order.Status,
+		&order.Accrual,
+		&order.UploadedAt,
+		&processedAt,
+	)
 
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrOrderNotFound
+		}
 		return nil, fmt.Errorf("error getting order by number: %w", err)
 	}
+
+	if processedAt.Valid {
+		order.ProcessedAt = &processedAt.Time
+	}
+
 	return &order, nil
 }
 
 // GetUserOrders возвращает все заказы пользователя
 func (r *PostgresRepository) GetUserOrders(ctx context.Context, userID int64) ([]domain.Order, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT number, user_id, status, accrual, uploaded_at 
+		`SELECT number, user_id, status, accrual, uploaded_at, processed_at 
 		 FROM orders 
 		 WHERE user_id = $1 
 		 ORDER BY uploaded_at DESC`,
@@ -121,12 +141,31 @@ func (r *PostgresRepository) GetUserOrders(ctx context.Context, userID int64) ([
 	var orders []domain.Order
 	for rows.Next() {
 		var order domain.Order
-		err := rows.Scan(&order.Number, &order.UserID, &order.Status, &order.Accrual, &order.UploadedAt)
+		var processedAt sql.NullTime
+
+		err := rows.Scan(
+			&order.Number,
+			&order.UserID,
+			&order.Status,
+			&order.Accrual,
+			&order.UploadedAt,
+			&processedAt,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning order: %w", err)
 		}
+
+		if processedAt.Valid {
+			order.ProcessedAt = &processedAt.Time
+		}
+
 		orders = append(orders, order)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating orders: %w", err)
+	}
+
 	return orders, nil
 }
 
@@ -134,9 +173,9 @@ func (r *PostgresRepository) GetUserOrders(ctx context.Context, userID int64) ([
 func (r *PostgresRepository) UpdateOrderStatus(ctx context.Context, number string, status domain.OrderStatus, accrual float64) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE orders 
-		 SET status = $1, accrual = $2 
-		 WHERE number = $3`,
-		status, accrual, number,
+		 SET status = $1, accrual = $2, processed_at = $3 
+		 WHERE number = $4`,
+		status, accrual, time.Now(), number,
 	)
 	if err != nil {
 		return fmt.Errorf("error updating order status: %w", err)
@@ -152,7 +191,7 @@ func (r *PostgresRepository) GetBalance(ctx context.Context, userID int64) (*dom
 		        COALESCE(SUM(CASE WHEN status = $1 THEN accrual ELSE 0 END), 0) as withdrawn
 		 FROM orders 
 		 WHERE user_id = $2`,
-		domain.OrderStatusProcessed, userID,
+		domain.StatusProcessed, userID,
 	).Scan(&balance.Current, &balance.Withdrawn)
 
 	if err != nil {

@@ -14,9 +14,8 @@ type UserUseCase interface {
 
 // OrderUseCase определяет интерфейс для бизнес-логики работы с заказами
 type OrderUseCase interface {
-	CreateOrder(ctx context.Context, userID int64, orderNumber string) error
+	UploadOrder(ctx context.Context, userID int64, orderNumber string) error
 	GetUserOrders(ctx context.Context, userID int64) ([]domain.Order, error)
-	ProcessOrder(ctx context.Context, orderNumber string) error
 }
 
 // BalanceUseCase определяет интерфейс для бизнес-логики работы с балансом
@@ -30,4 +29,3 @@ type BalanceUseCase interface {
 type AuthMiddleware interface {
 	GetUserID(token string) (int64, error)
 }
- 

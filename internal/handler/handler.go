@@ -2,12 +2,14 @@ package handler
 
 // Handler содержит все HTTP обработчики
 type Handler struct {
-	auth *AuthHandler
+	auth  *AuthHandler
+	order *OrderHandler
 }
 
 // NewHandler создает новый экземпляр Handler
-func NewHandler(auth *AuthHandler) *Handler {
+func NewHandler(auth *AuthHandler, order *OrderHandler) *Handler {
 	return &Handler{
-		auth: auth,
+		auth:  auth,
+		order: order,
 	}
 }

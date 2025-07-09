@@ -16,11 +16,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Создание таблицы заказов
 CREATE TABLE IF NOT EXISTS orders (
-    number VARCHAR(255) PRIMARY KEY,
+    number TEXT PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id),
     status VARCHAR(50) NOT NULL,
-    accrual DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    accrual DECIMAL(10, 2) DEFAULT 0,
     uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT valid_status CHECK (status IN ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED'))
 );
 

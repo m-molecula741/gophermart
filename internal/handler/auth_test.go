@@ -10,7 +10,15 @@ import (
 
 	"gophermart/internal/domain"
 	"gophermart/internal/handler/mocks"
+	"gophermart/internal/logger"
 )
+
+func init() {
+	// Инициализируем логгер для тестов
+	if err := logger.Initialize("info"); err != nil {
+		panic(err)
+	}
+}
 
 func TestAuthHandler(t *testing.T) {
 	tests := []struct {
@@ -102,6 +110,9 @@ func TestAuthHandler(t *testing.T) {
 			// Подготовка мока
 			mockUseCase := &mocks.MockUserUseCase{}
 			tt.mockBehavior(mockUseCase)
+			mockUseCase.ValidateTokenFunc = func(ctx context.Context, token string) (int64, error) {
+				return 1, nil
+			}
 
 			// Создание хендлера
 			handler := NewAuthHandler(mockUseCase)
