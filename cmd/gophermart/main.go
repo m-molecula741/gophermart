@@ -62,9 +62,13 @@ func main() {
 	// Инициализируем usecase и обработчики
 	userUseCase := usecase.NewUserUseCase(store, jwtManager)
 	orderUseCase := usecase.NewOrderUseCase(store, accrualService)
+	balanceUseCase := usecase.NewBalanceUseCase(store)
+
 	authHandler := handler.NewAuthHandler(userUseCase)
 	orderHandler := handler.NewOrderHandler(orderUseCase)
-	h := handler.NewHandler(authHandler, orderHandler)
+	balanceHandler := handler.NewBalanceHandler(balanceUseCase)
+
+	h := handler.NewHandler(authHandler, orderHandler, balanceHandler)
 	router := handler.NewRouter(h)
 	logger.Info("Handlers initialized successfully")
 

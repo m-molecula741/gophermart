@@ -12,10 +12,10 @@ type MockStorage struct {
 	GetUserByLoginFunc func(ctx context.Context, login string) (*domain.User, error)
 
 	// Заказы
-	CreateOrderFunc       func(ctx context.Context, userID int64, number string) error
-	GetUserOrdersFunc     func(ctx context.Context, userID int64) ([]domain.Order, error)
-	GetOrderByNumberFunc  func(ctx context.Context, number string) (*domain.Order, error)
-	UpdateOrderStatusFunc func(ctx context.Context, number string, status domain.OrderStatus, accrual float64) error
+	CreateOrderFunc                 func(ctx context.Context, userID int64, number string) error
+	GetUserOrdersFunc               func(ctx context.Context, userID int64) ([]domain.Order, error)
+	GetOrderByNumberFunc            func(ctx context.Context, number string) (*domain.Order, error)
+	UpdateOrderStatusAndBalanceFunc func(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error
 
 	// Баланс и списания
 	GetBalanceFunc         func(ctx context.Context, userID int64) (*domain.Balance, error)
@@ -64,9 +64,9 @@ func (m *MockStorage) GetOrderByNumber(ctx context.Context, number string) (*dom
 	return nil, nil
 }
 
-func (m *MockStorage) UpdateOrderStatus(ctx context.Context, number string, status domain.OrderStatus, accrual float64) error {
-	if m.UpdateOrderStatusFunc != nil {
-		return m.UpdateOrderStatusFunc(ctx, number, status, accrual)
+func (m *MockStorage) UpdateOrderStatusAndBalance(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+	if m.UpdateOrderStatusAndBalanceFunc != nil {
+		return m.UpdateOrderStatusAndBalanceFunc(ctx, number, status, accrual, userID)
 	}
 	return nil
 }

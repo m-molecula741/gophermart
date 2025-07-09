@@ -53,6 +53,10 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 		case domain.ErrOrderExists:
 			logger.Warn("Order already exists", zap.String("number", orderNumber))
 			http.Error(w, "order already exists", http.StatusConflict)
+		case domain.ErrOrderBelongsToUser:
+			logger.Info("Order already uploaded by current user", zap.String("number", orderNumber))
+			w.WriteHeader(http.StatusOK)
+			return
 		default:
 			logger.Error("Failed to upload order", zap.Error(err))
 			http.Error(w, "internal error", http.StatusInternalServerError)

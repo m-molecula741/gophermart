@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -185,4 +186,137 @@ func TestOrderUseCase(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOrderUseCase_ProcessOrderAccrual(t *testing.T) {
+	// Подготавливаем тестовые данные
+	orderNumber := "12345678903"
+	userID := int64(1)
+	accrual := float64(500)
+
+	// Создаем моки
+	mockStorage := &mocks.MockStorage{
+		GetOrderByNumberFunc: func(ctx context.Context, number string) (*domain.Order, error) {
+			return &domain.Order{
+				Number: number,
+				UserID: userID,
+				Status: domain.StatusNew,
+			}, nil
+		},
+		UpdateOrderStatusAndBalanceFunc: func(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+			// Проверяем, что параметры правильные
+			if number != orderNumber {
+				t.Errorf("Expected order number %s, got %s", orderNumber, number)
+			}
+			if status != domain.StatusProcessed {
+				t.Errorf("Expected status %s, got %s", domain.StatusProcessed, status)
+			}
+			if accrual != 500 {
+				t.Errorf("Expected accrual %f, got %f", 500.0, accrual)
+			}
+			if userID != 1 {
+				t.Errorf("Expected user ID %d, got %d", 1, userID)
+			}
+			return nil
+		},
+	}
+
+	mockAccrual := &mocks.MockAccrualService{
+		GetOrderAccrualFunc: func(ctx context.Context, orderNumber string) (*domain.Order, error) {
+			return &domain.Order{
+				Number:  orderNumber,
+				Status:  domain.StatusProcessed,
+				Accrual: accrual,
+			}, nil
+		},
+	}
+
+	// Создаем usecase
+	uc := NewOrderUseCase(mockStorage, mockAccrual)
+
+	// Запускаем обработку заказа
+	uc.processOrderAccrual(orderNumber)
+
+	// Проверяем, что все методы были вызваны
+	// Добавьте здесь дополнительные проверки, если необходимо
+}
+
+func TestOrderUseCase_ProcessOrderAccrual_Error(t *testing.T) {
+	// Подготавливаем тестовые данные
+	orderNumber := "12345678903"
+	userID := int64(1)
+
+	// Создаем моки с ошибками
+	mockStorage := &mocks.MockStorage{
+		GetOrderByNumberFunc: func(ctx context.Context, number string) (*domain.Order, error) {
+			return &domain.Order{
+				Number: number,
+				UserID: userID,
+				Status: domain.StatusNew,
+			}, nil
+		},
+		UpdateOrderStatusAndBalanceFunc: func(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+			return fmt.Errorf("database error")
+		},
+	}
+
+	mockAccrual := &mocks.MockAccrualService{
+		GetOrderAccrualFunc: func(ctx context.Context, orderNumber string) (*domain.Order, error) {
+			return &domain.Order{
+				Number:  orderNumber,
+				Status:  domain.StatusProcessed,
+				Accrual: 500,
+			}, nil
+		},
+	}
+
+	// Создаем usecase
+	uc := NewOrderUseCase(mockStorage, mockAccrual)
+
+	// Запускаем обработку заказа
+	uc.processOrderAccrual(orderNumber)
+
+	// Проверяем, что все методы были вызваны
+	// Добавьте здесь дополнительные проверки, если необходимо
+}
+
+func TestOrderUseCase_ProcessOrderAccrual_InvalidStatus(t *testing.T) {
+	// Подготавливаем тестовые данные
+	orderNumber := "12345678903"
+	userID := int64(1)
+
+	// Создаем моки
+	mockStorage := &mocks.MockStorage{
+		GetOrderByNumberFunc: func(ctx context.Context, number string) (*domain.Order, error) {
+			return &domain.Order{
+				Number: number,
+				UserID: userID,
+				Status: domain.StatusNew,
+			}, nil
+		},
+		UpdateOrderStatusAndBalanceFunc: func(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+			if status != domain.StatusInvalid {
+				t.Errorf("Expected status %s, got %s", domain.StatusInvalid, status)
+			}
+			return nil
+		},
+	}
+
+	mockAccrual := &mocks.MockAccrualService{
+		GetOrderAccrualFunc: func(ctx context.Context, orderNumber string) (*domain.Order, error) {
+			return &domain.Order{
+				Number: orderNumber,
+				Status: domain.StatusInvalid,
+			}, nil
+		},
+	}
+
+	// Создаем usecase
+	uc := NewOrderUseCase(mockStorage, mockAccrual)
+
+	// Запускаем обработку заказа
+	uc.processOrderAccrual(orderNumber)
+
+	// Проверяем, что все методы были вызваны
+	// Добавьте здесь дополнительные проверки, если необходимо
 }

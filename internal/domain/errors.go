@@ -26,6 +26,9 @@ var (
 
 	// ErrUserNotFound пользователь не найден
 	ErrUserNotFound = errors.New("user not found")
+
+	// ErrOrderBelongsToUser возвращается, когда заказ уже был загружен текущим пользователем
+	ErrOrderBelongsToUser = errors.New("order already belongs to user")
 )
 
 // TooManyRequestsError ошибка превышения лимита запросов

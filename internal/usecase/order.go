@@ -130,15 +130,24 @@ func (uc *orderUseCase) processOrderAccrual(orderNumber string) {
 				zap.String("status", string(order.Status)),
 				zap.Float64("accrual", order.Accrual))
 
-			// Обновляем статус и начисление в БД только если получили ответ от системы начислений
-			if err := uc.storage.UpdateOrderStatus(uc.ctx, orderNumber, order.Status, order.Accrual); err != nil {
-				logger.Error("Failed to update order",
+			// Получаем существующий заказ для определения userID
+			existingOrder, err := uc.storage.GetOrderByNumber(uc.ctx, orderNumber)
+			if err != nil {
+				logger.Error("Failed to get existing order",
 					zap.Error(err),
 					zap.String("order", orderNumber))
 				continue
 			}
 
-			logger.Info("Updated order status in database",
+			// Атомарно обновляем статус заказа и баланс
+			if err := uc.storage.UpdateOrderStatusAndBalance(uc.ctx, orderNumber, order.Status, order.Accrual, existingOrder.UserID); err != nil {
+				logger.Error("Failed to update order status and balance",
+					zap.Error(err),
+					zap.String("order", orderNumber))
+				continue
+			}
+
+			logger.Info("Updated order status and balance in database",
 				zap.String("order", orderNumber),
 				zap.String("status", string(order.Status)),
 				zap.Float64("accrual", order.Accrual))
@@ -200,13 +209,14 @@ func (uc *orderUseCase) UploadOrder(ctx context.Context, userID int64, orderNumb
 		logger.Info("Order already uploaded by current user",
 			zap.String("number", orderNumber),
 			zap.Int64("user_id", userID))
-		return nil
+		return domain.ErrOrderBelongsToUser
 	}
 
 	// Если заказ принадлежит другому пользователю
-	logger.Warn("Order already uploaded by another user",
+	logger.Warn("Order belongs to another user",
 		zap.String("number", orderNumber),
-		zap.Int64("user_id", userID))
+		zap.Int64("user_id", userID),
+		zap.Int64("owner_id", existingOrder.UserID))
 	return domain.ErrOrderExists
 }
 

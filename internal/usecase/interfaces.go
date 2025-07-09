@@ -16,7 +16,7 @@ type Storage interface {
 	CreateOrder(ctx context.Context, userID int64, number string) error
 	GetUserOrders(ctx context.Context, userID int64) ([]domain.Order, error)
 	GetOrderByNumber(ctx context.Context, number string) (*domain.Order, error)
-	UpdateOrderStatus(ctx context.Context, number string, status domain.OrderStatus, accrual float64) error
+	UpdateOrderStatusAndBalance(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error
 
 	// Баланс и списания
 	GetBalance(ctx context.Context, userID int64) (*domain.Balance, error)

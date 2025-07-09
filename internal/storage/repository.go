@@ -169,40 +169,99 @@ func (r *PostgresRepository) GetUserOrders(ctx context.Context, userID int64) ([
 	return orders, nil
 }
 
-// UpdateOrderStatus обновляет статус заказа
-func (r *PostgresRepository) UpdateOrderStatus(ctx context.Context, number string, status domain.OrderStatus, accrual float64) error {
-	_, err := r.pool.Exec(ctx,
+// UpdateOrderStatusAndBalance атомарно обновляет статус заказа и баланс пользователя
+func (r *PostgresRepository) UpdateOrderStatusAndBalance(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Обновляем статус заказа
+	_, err = tx.Exec(ctx,
 		`UPDATE orders 
-		 SET status = $1, accrual = $2, processed_at = $3 
-		 WHERE number = $4`,
+         SET status = $1, accrual = $2, processed_at = $3 
+         WHERE number = $4`,
 		status, accrual, time.Now(), number,
 	)
 	if err != nil {
 		return fmt.Errorf("error updating order status: %w", err)
 	}
+
+	// Если статус PROCESSED и есть начисление, обновляем баланс
+	if status == domain.StatusProcessed && accrual > 0 {
+		// Проверяем существование записи в таблице balances
+		var exists bool
+		err := tx.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM balances WHERE user_id = $1)`,
+			userID,
+		).Scan(&exists)
+		if err != nil {
+			return fmt.Errorf("error checking balance existence: %w", err)
+		}
+
+		if exists {
+			// Обновляем существующий баланс
+			_, err = tx.Exec(ctx,
+				`UPDATE balances 
+                 SET current = current + $1 
+                 WHERE user_id = $2`,
+				accrual, userID,
+			)
+		} else {
+			// Создаем новую запись баланса
+			_, err = tx.Exec(ctx,
+				`INSERT INTO balances (user_id, current, withdrawn) 
+                 VALUES ($1, $2, 0)`,
+				userID, accrual,
+			)
+		}
+		if err != nil {
+			return fmt.Errorf("error updating balance: %w", err)
+		}
+	}
+
+	// Фиксируем транзакцию
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing transaction: %w", err)
+	}
+
 	return nil
 }
 
 // GetBalance возвращает баланс пользователя
 func (r *PostgresRepository) GetBalance(ctx context.Context, userID int64) (*domain.Balance, error) {
 	var balance domain.Balance
+
+	// Получаем текущий баланс из таблицы balances
 	err := r.pool.QueryRow(ctx,
-		`SELECT COALESCE(SUM(accrual), 0) as current,
-		        COALESCE(SUM(CASE WHEN status = $1 THEN accrual ELSE 0 END), 0) as withdrawn
-		 FROM orders 
-		 WHERE user_id = $2`,
-		domain.StatusProcessed, userID,
+		`SELECT COALESCE(current, 0), COALESCE(withdrawn, 0)
+		 FROM balances 
+		 WHERE user_id = $1`,
+		userID,
 	).Scan(&balance.Current, &balance.Withdrawn)
 
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			// Если записи нет, возвращаем нулевой баланс
+			return &domain.Balance{Current: 0, Withdrawn: 0}, nil
+		}
 		return nil, fmt.Errorf("error getting balance: %w", err)
 	}
+
 	return &balance, nil
 }
 
 // CreateWithdrawal создает новое списание
 func (r *PostgresRepository) CreateWithdrawal(ctx context.Context, userID int64, orderNumber string, sum float64) error {
-	_, err := r.pool.Exec(ctx,
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Создаем запись о списании
+	_, err = tx.Exec(ctx,
 		`INSERT INTO withdrawals (user_id, order_number, sum) 
 		 VALUES ($1, $2, $3)`,
 		userID, orderNumber, sum,
@@ -210,6 +269,30 @@ func (r *PostgresRepository) CreateWithdrawal(ctx context.Context, userID int64,
 	if err != nil {
 		return fmt.Errorf("error creating withdrawal: %w", err)
 	}
+
+	// Обновляем баланс пользователя
+	result, err := tx.Exec(ctx,
+		`UPDATE balances 
+		 SET current = current - $1,
+		     withdrawn = withdrawn + $1
+		 WHERE user_id = $2 AND current >= $1`,
+		sum, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("error updating balance: %w", err)
+	}
+
+	// Проверяем, что обновление баланса произошло
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return domain.ErrInsufficientFunds
+	}
+
+	// Фиксируем транзакцию
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing transaction: %w", err)
+	}
+
 	return nil
 }
 
