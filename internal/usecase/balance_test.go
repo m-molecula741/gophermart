@@ -71,82 +71,93 @@ func TestBalanceUseCase(t *testing.T) {
 
 func TestBalanceUseCase_Withdraw(t *testing.T) {
 	tests := []struct {
-		name         string
-		userID       int64
-		request      domain.WithdrawalRequest
-		mockBehavior func(*mocks.MockStorage)
-		wantErr      bool
+		name          string
+		userID        int64
+		withdrawal    domain.WithdrawalRequest
+		mockBehavior  func(*mocks.MockStorage)
+		expectedError error
 	}{
 		{
 			name:   "Успешное списание",
 			userID: 1,
-			request: domain.WithdrawalRequest{
+			withdrawal: domain.WithdrawalRequest{
 				Order: "12345678903",
 				Sum:   100,
 			},
 			mockBehavior: func(s *mocks.MockStorage) {
 				s.GetBalanceFunc = func(ctx context.Context, userID int64) (*domain.Balance, error) {
-					return &domain.Balance{
-						Current:   1000,
-						Withdrawn: 500,
-					}, nil
+					return &domain.Balance{Current: 200, Withdrawn: 0}, nil
 				}
-				s.CreateWithdrawalFunc = func(ctx context.Context, userID int64, orderNumber string, sum float64) error {
+				s.CreateWithdrawalFunc = func(ctx context.Context, userID int64, orderNumber string, amount float64) error {
 					return nil
 				}
 			},
-			wantErr: false,
+			expectedError: nil,
 		},
 		{
 			name:   "Недостаточно средств",
 			userID: 1,
-			request: domain.WithdrawalRequest{
+			withdrawal: domain.WithdrawalRequest{
 				Order: "12345678903",
-				Sum:   2000,
+				Sum:   200,
 			},
 			mockBehavior: func(s *mocks.MockStorage) {
 				s.GetBalanceFunc = func(ctx context.Context, userID int64) (*domain.Balance, error) {
-					return &domain.Balance{
-						Current:   1000,
-						Withdrawn: 500,
-					}, nil
+					return &domain.Balance{Current: 100, Withdrawn: 0}, nil
 				}
 			},
-			wantErr: true,
-		},
-		{
-			name:   "Неверный номер заказа",
-			userID: 1,
-			request: domain.WithdrawalRequest{
-				Order: "invalid",
-				Sum:   100,
-			},
-			mockBehavior: func(s *mocks.MockStorage) {
-				s.GetBalanceFunc = func(ctx context.Context, userID int64) (*domain.Balance, error) {
-					return &domain.Balance{
-						Current:   1000,
-						Withdrawn: 500,
-					}, nil
-				}
-			},
-			wantErr: true,
+			expectedError: domain.ErrInsufficientFunds,
 		},
 		{
 			name:   "Отрицательная сумма",
 			userID: 1,
-			request: domain.WithdrawalRequest{
+			withdrawal: domain.WithdrawalRequest{
 				Order: "12345678903",
 				Sum:   -100,
 			},
+			mockBehavior:  func(s *mocks.MockStorage) {},
+			expectedError: domain.ErrInvalidAmount,
+		},
+		{
+			name:   "Неверный формат номера заказа",
+			userID: 1,
+			withdrawal: domain.WithdrawalRequest{
+				Order: "invalid",
+				Sum:   100,
+			},
+			mockBehavior:  func(s *mocks.MockStorage) {},
+			expectedError: domain.ErrInvalidOrderNumber,
+		},
+		{
+			name:   "Ошибка при получении баланса",
+			userID: 1,
+			withdrawal: domain.WithdrawalRequest{
+				Order: "12345678903",
+				Sum:   100,
+			},
 			mockBehavior: func(s *mocks.MockStorage) {
 				s.GetBalanceFunc = func(ctx context.Context, userID int64) (*domain.Balance, error) {
-					return &domain.Balance{
-						Current:   1000,
-						Withdrawn: 500,
-					}, nil
+					return nil, domain.ErrUserNotFound
 				}
 			},
-			wantErr: true,
+			expectedError: domain.ErrUserNotFound,
+		},
+		{
+			name:   "Ошибка при создании списания",
+			userID: 1,
+			withdrawal: domain.WithdrawalRequest{
+				Order: "12345678903",
+				Sum:   100,
+			},
+			mockBehavior: func(s *mocks.MockStorage) {
+				s.GetBalanceFunc = func(ctx context.Context, userID int64) (*domain.Balance, error) {
+					return &domain.Balance{Current: 200, Withdrawn: 0}, nil
+				}
+				s.CreateWithdrawalFunc = func(ctx context.Context, userID int64, orderNumber string, amount float64) error {
+					return domain.ErrOrderExists
+				}
+			},
+			expectedError: domain.ErrOrderExists,
 		},
 	}
 
@@ -157,9 +168,9 @@ func TestBalanceUseCase_Withdraw(t *testing.T) {
 
 			uc := NewBalanceUseCase(mockStorage)
 
-			err := uc.Withdraw(context.Background(), tt.userID, tt.request)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Withdraw() error = %v, wantErr %v", err, tt.wantErr)
+			err := uc.Withdraw(context.Background(), tt.userID, tt.withdrawal)
+			if err != tt.expectedError {
+				t.Errorf("Withdraw() error = %v, wantErr %v", err, tt.expectedError)
 			}
 		})
 	}

@@ -114,6 +114,41 @@ func TestOrderUseCase(t *testing.T) {
 			},
 			expectedError: domain.ErrOrderBelongsToUser,
 		},
+		{
+			name:        "Ошибка при создании заказа",
+			userID:      1,
+			orderNumber: "12345678903",
+			mockBehavior: func(s *mocks.MockStorage, a *mocks.MockAccrualService) {
+				s.GetOrderByNumberFunc = func(ctx context.Context, number string) (*domain.Order, error) {
+					return nil, domain.ErrOrderNotFound
+				}
+				s.CreateOrderFunc = func(ctx context.Context, userID int64, number string) error {
+					return domain.ErrOrderExists
+				}
+			},
+			expectedError: domain.ErrOrderExists,
+		},
+		{
+			name:        "Ошибка при проверке существования заказа",
+			userID:      1,
+			orderNumber: "12345678903",
+			mockBehavior: func(s *mocks.MockStorage, a *mocks.MockAccrualService) {
+				s.GetOrderByNumberFunc = func(ctx context.Context, number string) (*domain.Order, error) {
+					return nil, domain.ErrOrderNotFound
+				}
+				s.CreateOrderFunc = func(ctx context.Context, userID int64, number string) error {
+					return domain.ErrOrderNotFound
+				}
+			},
+			expectedError: domain.ErrOrderNotFound,
+		},
+		{
+			name:          "Невалидный номер заказа по алгоритму Луна",
+			userID:        1,
+			orderNumber:   "12345678902", // Неверная контрольная сумма
+			mockBehavior:  func(s *mocks.MockStorage, a *mocks.MockAccrualService) {},
+			expectedError: domain.ErrInvalidOrderNumber,
+		},
 	}
 
 	for _, tt := range uploadTests {
