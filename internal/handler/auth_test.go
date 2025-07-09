@@ -39,12 +39,12 @@ func TestAuthHandler(t *testing.T) {
 				Password: "testpass",
 			},
 			mockBehavior: func(m *mocks.MockUserUseCase) {
-				m.RegisterFunc = func(ctx context.Context, creds *domain.Credentials) (string, error) {
-					return "test.token.123", nil
+				m.RegisterFunc = func(ctx context.Context, creds *domain.Credentials) error {
+					return nil
 				}
 			},
 			expectedCode:  http.StatusOK,
-			expectedToken: "Bearer test.token.123",
+			expectedToken: "",
 		},
 		{
 			name:     "Регистрация существующего пользователя",
@@ -55,8 +55,8 @@ func TestAuthHandler(t *testing.T) {
 				Password: "testpass",
 			},
 			mockBehavior: func(m *mocks.MockUserUseCase) {
-				m.RegisterFunc = func(ctx context.Context, creds *domain.Credentials) (string, error) {
-					return "", domain.ErrUserExists
+				m.RegisterFunc = func(ctx context.Context, creds *domain.Credentials) error {
+					return domain.ErrUserExists
 				}
 			},
 			expectedCode:  http.StatusConflict,

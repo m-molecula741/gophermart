@@ -129,7 +129,8 @@ func TestUserUseCase(t *testing.T) {
 			ctx := context.Background()
 			switch tt.operation {
 			case "register":
-				token, err = uc.Register(ctx, tt.credentials)
+				err = uc.Register(ctx, tt.credentials)
+				token = "" // При регистрации токен не возвращается
 			case "login":
 				token, err = uc.Login(ctx, tt.credentials)
 			}

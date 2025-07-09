@@ -72,8 +72,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("Processing registration request", zap.String("login", creds.Login))
 
-	token, err := h.userUseCase.Register(r.Context(), &creds)
-	if err != nil {
+	if err := h.userUseCase.Register(r.Context(), &creds); err != nil {
 		switch err {
 		case domain.ErrUserExists:
 			logger.Warn("Registration failed: user already exists", zap.String("login", creds.Login))
@@ -86,7 +85,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info("User registered successfully", zap.String("login", creds.Login))
-	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
 }
 
 // Login обрабатывает вход пользователя
@@ -114,5 +113,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info("User logged in successfully", zap.String("login", creds.Login))
+
+	// Устанавливаем заголовок Content-Type
+	w.Header().Set("Content-Type", "application/json")
+	// Устанавливаем токен в заголовок Authorization
 	w.Header().Set("Authorization", "Bearer "+token)
+
+	// Отправляем успешный ответ с данными пользователя
+	response := map[string]string{
+		"login": creds.Login,
+		"token": token,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode response", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 }

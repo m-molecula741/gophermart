@@ -26,41 +26,25 @@ func NewUserUseCase(storage Storage, jwt *jwt.Manager) *userUseCase {
 }
 
 // Register регистрирует нового пользователя
-func (uc *userUseCase) Register(ctx context.Context, creds *domain.Credentials) (string, error) {
+func (uc *userUseCase) Register(ctx context.Context, creds *domain.Credentials) error {
 	logger.Debug("Hashing password for new user", zap.String("login", creds.Login))
 
 	// Хешируем пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
 	if err != nil {
 		logger.Error("Failed to hash password", zap.Error(err))
-		return "", err
+		return err
 	}
 
 	// Создаем пользователя
 	logger.Debug("Creating new user in storage", zap.String("login", creds.Login))
 	if err := uc.storage.CreateUser(ctx, creds.Login, string(hashedPassword)); err != nil {
 		logger.Error("Failed to create user", zap.Error(err), zap.String("login", creds.Login))
-		return "", err
+		return err
 	}
 
-	// Получаем созданного пользователя для ID
-	logger.Debug("Retrieving created user", zap.String("login", creds.Login))
-	user, err := uc.storage.GetUserByLogin(ctx, creds.Login)
-	if err != nil {
-		logger.Error("Failed to get created user", zap.Error(err), zap.String("login", creds.Login))
-		return "", err
-	}
-
-	// Генерируем JWT токен
-	logger.Debug("Generating JWT token", zap.Int64("user_id", user.ID))
-	token, err := uc.jwt.GenerateToken(user.ID)
-	if err != nil {
-		logger.Error("Failed to generate token", zap.Error(err), zap.Int64("user_id", user.ID))
-		return "", err
-	}
-
-	logger.Info("User registered successfully", zap.String("login", creds.Login), zap.Int64("user_id", user.ID))
-	return token, nil
+	logger.Info("User registered successfully", zap.String("login", creds.Login))
+	return nil
 }
 
 // Login аутентифицирует пользователя

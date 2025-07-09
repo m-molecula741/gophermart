@@ -3,13 +3,13 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"gophermart/internal/domain"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -111,7 +111,7 @@ func (r *PostgresRepository) GetOrderByNumber(ctx context.Context, number string
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if err == pgx.ErrNoRows {
 			return nil, domain.ErrOrderNotFound
 		}
 		return nil, fmt.Errorf("error getting order by number: %w", err)

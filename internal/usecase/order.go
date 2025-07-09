@@ -171,29 +171,28 @@ func (uc *orderUseCase) UploadOrder(ctx context.Context, userID int64, orderNumb
 
 	// Проверяем существование заказа
 	existingOrder, err := uc.storage.GetOrderByNumber(ctx, orderNumber)
-	if err != nil && !errors.Is(err, domain.ErrOrderNotFound) {
-		// Если это любая другая ошибка, кроме ErrOrderNotFound
-		logger.Error("Failed to check order existence", zap.Error(err))
-		return err
-	}
+	if err != nil {
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			// Если заказ не найден, создаем новый
+			if err := uc.storage.CreateOrder(ctx, userID, orderNumber); err != nil {
+				logger.Error("Failed to create order",
+					zap.Error(err),
+					zap.String("number", orderNumber),
+					zap.Int64("user_id", userID))
+				return err
+			}
 
-	// Если заказ не найден, создаем новый
-	if errors.Is(err, domain.ErrOrderNotFound) {
-		if err := uc.storage.CreateOrder(ctx, userID, orderNumber); err != nil {
-			logger.Error("Failed to create order",
-				zap.Error(err),
+			// Запускаем обработку начисления в фоновом режиме
+			go uc.processOrderAccrual(orderNumber)
+
+			logger.Info("Order uploaded successfully",
 				zap.String("number", orderNumber),
 				zap.Int64("user_id", userID))
-			return err
+			return nil
 		}
-
-		// Запускаем обработку начисления в фоновом режиме
-		go uc.processOrderAccrual(orderNumber)
-
-		logger.Info("Order uploaded successfully",
-			zap.String("number", orderNumber),
-			zap.Int64("user_id", userID))
-		return nil
+		// Если это любая другая ошибка
+		logger.Error("Failed to check order existence", zap.Error(err))
+		return err
 	}
 
 	// Если заказ существует, проверяем принадлежность

@@ -12,6 +12,8 @@ func NewRouter(h *Handler) chi.Router {
 	// Middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
 
 	// Public routes
 	r.Post("/api/user/register", h.auth.Register)

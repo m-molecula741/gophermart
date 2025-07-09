@@ -7,13 +7,16 @@ import (
 
 // MockUserUseCase мок для UserUseCase
 type MockUserUseCase struct {
-	RegisterFunc      func(ctx context.Context, creds *domain.Credentials) (string, error)
+	RegisterFunc      func(ctx context.Context, creds *domain.Credentials) error
 	LoginFunc         func(ctx context.Context, creds *domain.Credentials) (string, error)
 	ValidateTokenFunc func(ctx context.Context, token string) (int64, error)
 }
 
-func (m *MockUserUseCase) Register(ctx context.Context, creds *domain.Credentials) (string, error) {
-	return m.RegisterFunc(ctx, creds)
+func (m *MockUserUseCase) Register(ctx context.Context, creds *domain.Credentials) error {
+	if m.RegisterFunc != nil {
+		return m.RegisterFunc(ctx, creds)
+	}
+	return nil
 }
 
 func (m *MockUserUseCase) Login(ctx context.Context, creds *domain.Credentials) (string, error) {
