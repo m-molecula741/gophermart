@@ -14,8 +14,8 @@ import (
 )
 
 func init() {
-	// Инициализируем логгер для тестов
-	if err := logger.Initialize("info"); err != nil {
+	// Инициализируем логгер для тестов с уровнем error
+	if err := logger.Initialize("error"); err != nil {
 		panic(err)
 	}
 }

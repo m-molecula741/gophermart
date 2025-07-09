@@ -7,9 +7,12 @@ import (
 
 // MockOrderUseCase мок для OrderUseCase
 type MockOrderUseCase struct {
-	UploadOrderFunc   func(ctx context.Context, userID int64, orderNumber string) error
-	GetUserOrdersFunc func(ctx context.Context, userID int64) ([]domain.Order, error)
-	ShutdownFunc      func(ctx context.Context)
+	UploadOrderFunc    func(ctx context.Context, userID int64, orderNumber string) error
+	GetUserOrdersFunc  func(ctx context.Context, userID int64) ([]domain.Order, error)
+	GetBalanceFunc     func(ctx context.Context, userID int64) (*domain.Balance, error)
+	WithdrawFunc       func(ctx context.Context, userID int64, orderNumber string, sum float64) error
+	GetWithdrawalsFunc func(ctx context.Context, userID int64) ([]domain.Withdrawal, error)
+	ShutdownFunc       func(ctx context.Context)
 }
 
 func (m *MockOrderUseCase) UploadOrder(ctx context.Context, userID int64, orderNumber string) error {
@@ -22,6 +25,27 @@ func (m *MockOrderUseCase) UploadOrder(ctx context.Context, userID int64, orderN
 func (m *MockOrderUseCase) GetUserOrders(ctx context.Context, userID int64) ([]domain.Order, error) {
 	if m.GetUserOrdersFunc != nil {
 		return m.GetUserOrdersFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockOrderUseCase) GetBalance(ctx context.Context, userID int64) (*domain.Balance, error) {
+	if m.GetBalanceFunc != nil {
+		return m.GetBalanceFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockOrderUseCase) Withdraw(ctx context.Context, userID int64, orderNumber string, sum float64) error {
+	if m.WithdrawFunc != nil {
+		return m.WithdrawFunc(ctx, userID, orderNumber, sum)
+	}
+	return nil
+}
+
+func (m *MockOrderUseCase) GetWithdrawals(ctx context.Context, userID int64) ([]domain.Withdrawal, error) {
+	if m.GetWithdrawalsFunc != nil {
+		return m.GetWithdrawalsFunc(ctx, userID)
 	}
 	return nil, nil
 }
