@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -41,8 +42,21 @@ func main() {
 		zap.String("database_uri", cfg.DatabaseURI),
 		zap.String("accrual_address", cfg.AccrualSystemAddress))
 
+	// Определяем путь к миграциям относительно исполняемого файла
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		logger.Error("Failed to determine executable path")
+		os.Exit(1)
+	}
+	execDir := filepath.Dir(filename)
+	projectRoot := filepath.Dir(filepath.Dir(execDir))
+	migrationsPath := filepath.Join(projectRoot, "migrations")
+
+	logger.Info("Running migrations",
+		zap.String("migrations_path", migrationsPath),
+		zap.String("database_uri", cfg.DatabaseURI))
+
 	// Запускаем миграции
-	migrationsPath := filepath.Join("migrations")
 	if err := storage.RunMigrations(cfg.DatabaseURI, migrationsPath); err != nil {
 		logger.Error("Failed to run migrations", zap.Error(err))
 		os.Exit(1)
