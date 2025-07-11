@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -39,6 +40,14 @@ func main() {
 		zap.String("run_address", cfg.RunAddress),
 		zap.String("database_uri", cfg.DatabaseURI),
 		zap.String("accrual_address", cfg.AccrualSystemAddress))
+
+	// Запускаем миграции
+	migrationsPath := filepath.Join("migrations")
+	if err := storage.RunMigrations(cfg.DatabaseURI, migrationsPath); err != nil {
+		logger.Error("Failed to run migrations", zap.Error(err))
+		os.Exit(1)
+	}
+	logger.Info("Database migrations completed successfully")
 
 	// Инициализируем хранилище
 	store, err := storage.NewPostgresRepository(context.Background(), cfg.DatabaseURI)
