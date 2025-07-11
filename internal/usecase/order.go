@@ -217,7 +217,7 @@ func (uc *orderUseCase) UploadOrder(ctx context.Context, userID int64, orderNumb
 		zap.String("number", orderNumber),
 		zap.Int64("user_id", userID),
 		zap.Int64("owner_id", existingOrder.UserID))
-	return domain.ErrOrderExists
+	return domain.ErrOrderBelongsToAnotherUser
 }
 
 // GetUserOrders возвращает список заказов пользователя

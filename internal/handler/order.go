@@ -59,7 +59,7 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 		case domain.ErrOrderBelongsToUser:
 			w.WriteHeader(http.StatusOK)
 		case domain.ErrOrderBelongsToAnotherUser:
-			http.Error(w, err.Error(), http.StatusConflict)
+			w.WriteHeader(http.StatusConflict)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

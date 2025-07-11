@@ -98,7 +98,7 @@ func TestOrderUseCase(t *testing.T) {
 					}, nil
 				}
 			},
-			expectedError: domain.ErrOrderExists,
+			expectedError: domain.ErrOrderBelongsToAnotherUser,
 		},
 		{
 			name:        "Заказ уже существует у текущего пользователя",
