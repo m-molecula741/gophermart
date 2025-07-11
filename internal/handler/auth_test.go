@@ -42,9 +42,12 @@ func TestAuthHandler(t *testing.T) {
 				m.RegisterFunc = func(ctx context.Context, creds *domain.Credentials) error {
 					return nil
 				}
+				m.LoginFunc = func(ctx context.Context, creds *domain.Credentials) (string, error) {
+					return "test.token.123", nil
+				}
 			},
 			expectedCode:  http.StatusOK,
-			expectedToken: "",
+			expectedToken: "Bearer test.token.123",
 		},
 		{
 			name:     "Регистрация существующего пользователя",

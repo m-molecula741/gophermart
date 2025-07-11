@@ -94,7 +94,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Генерируем токен после успешной регистрации
+	token, err := h.userUseCase.Login(r.Context(), &creds)
+	if err != nil {
+		logger.Error("Failed to generate token after registration", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	logger.Info("User registered successfully", zap.String("login", creds.Login))
+
+	// Устанавливаем токен в заголовок Authorization
+	w.Header().Set("Authorization", "Bearer "+token)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -124,19 +135,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("User logged in successfully", zap.String("login", creds.Login))
 
-	// Устанавливаем заголовок Content-Type
-	w.Header().Set("Content-Type", "application/json")
 	// Устанавливаем токен в заголовок Authorization
 	w.Header().Set("Authorization", "Bearer "+token)
-
-	// Отправляем успешный ответ с данными пользователя
-	response := map[string]string{
-		"login": creds.Login,
-		"token": token,
-	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("Failed to encode response", zap.Error(err))
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
+	w.WriteHeader(http.StatusOK)
 }
