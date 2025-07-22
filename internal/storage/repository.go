@@ -171,7 +171,14 @@ func (r *PostgresRepository) GetUserOrders(ctx context.Context, userID int64) ([
 
 // UpdateOrderStatusAndBalance атомарно обновляет статус заказа и баланс пользователя
 func (r *PostgresRepository) UpdateOrderStatusAndBalance(ctx context.Context, number string, status domain.OrderStatus, accrual float64, userID int64) error {
-	tx, err := r.pool.Begin(ctx)
+	// Получаем соединение из пула
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("error acquiring connection: %w", err)
+	}
+	defer conn.Release()
+
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
@@ -254,7 +261,14 @@ func (r *PostgresRepository) GetBalance(ctx context.Context, userID int64) (*dom
 
 // CreateWithdrawal создает новое списание
 func (r *PostgresRepository) CreateWithdrawal(ctx context.Context, userID int64, orderNumber string, sum float64) error {
-	tx, err := r.pool.Begin(ctx)
+	// Получаем соединение из пула
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("error acquiring connection: %w", err)
+	}
+	defer conn.Release()
+
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)
 	}
